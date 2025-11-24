@@ -1,0 +1,104 @@
+/* Talon — gold/amber accent, rounded UI, subtle fade-up motion. */
+
+:root {
+    --color-primary: #b8962e;
+    --color-primary-dark-1: #a0801f;
+    --color-primary-dark-2: #8a6d19;
+    --color-primary-light-1: #cbab4a;
+    --color-primary-light-2: #ddc06a;
+    --color-primary-alpha-10: rgba(184, 150, 46, 0.1);
+    --color-primary-alpha-20: rgba(184, 150, 46, 0.2);
+    --color-secondary: #e6c866;
+    --color-link: #b8962e;
+}
+
+/* --- rounded everything ------------------------------------------------ */
+.ui.button,
+.ui.input input,
+.ui.form input,
+.ui.form textarea,
+.ui.form select,
+.ui.card,
+.ui.cards > .card,
+.flex-item,
+.ui.segment,
+.ui.attached.segment,
+.ui.label,
+.ui.avatar,
+img.ui.avatar,
+.ui.dropdown .menu,
+.repo-header,
+.ui.tabular.menu .item,
+textarea,
+pre,
+.markup pre,
+.markup code {
+    border-radius: 12px !important;
+}
+
+.ui.attached.segment:first-child,
+.ui.top.attached.segment {
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+}
+.ui.attached.segment:last-child,
+.ui.bottom.attached.segment {
+    border-bottom-left-radius: 12px !important;
+    border-bottom-right-radius: 12px !important;
+}
+
+/* --- fade-up on page load ---------------------------------------------- */
+@keyframes talon-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#profile-avatar-card,
+.flex-list > .flex-item,
+.ui.cards > .card,
+.repository.file-list,
+.page-content > .ui.container > * {
+    animation: talon-fade-up 0.4s ease-out both;
+}
+
+.flex-list > .flex-item:nth-child(1) { animation-delay: 0.02s; }
+.flex-list > .flex-item:nth-child(2) { animation-delay: 0.06s; }
+.flex-list > .flex-item:nth-child(3) { animation-delay: 0.10s; }
+.flex-list > .flex-item:nth-child(4) { animation-delay: 0.14s; }
+.flex-list > .flex-item:nth-child(5) { animation-delay: 0.18s; }
+.flex-list > .flex-item:nth-child(6) { animation-delay: 0.22s; }
+.flex-list > .flex-item:nth-child(n+7) { animation-delay: 0.26s; }
+
+/* --- profile page: repos as a GitHub-style 2-column grid of boxes ------ */
+/* Scoped to the profile layout only (the grid that contains the avatar
+   card), so other flex-lists (issues, explore, org pages) are untouched. */
+.ui.stackable.grid:has(#profile-avatar-card) .flex-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.ui.stackable.grid:has(#profile-avatar-card) .flex-list > .flex-item {
+    border: 1px solid var(--color-secondary-bg, rgba(184, 150, 46, 0.25));
+    padding: 1rem 1.25rem;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.ui.stackable.grid:has(#profile-avatar-card) .flex-list > .flex-item:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+@media (max-width: 767px) {
+    .ui.stackable.grid:has(#profile-avatar-card) .flex-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- profile README, GitHub-style card ---------------------------------- */
+.ui.stackable.grid:has(#profile-avatar-card) .markup {
+    border: 1px solid var(--color-secondary-bg, rgba(184, 150, 46, 0.25));
+    border-radius: 12px;
+    padding: 1.5rem;
+    animation: talon-fade-up 0.4s ease-out both;
+}

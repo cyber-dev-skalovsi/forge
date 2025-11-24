@@ -1,0 +1,124 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: Forgejo
+spec:
+  description: Private single-user git forge (Forgejo 15 LTS, SQLite, lean UI)
+  icon: https://forgejo.org/_astro/logo.svg
+  tags:
+    - Developer Tools
+  variables:
+    - key: PUBLIC_DOMAIN
+      type: DOMAIN
+      name: Zeabur domain
+      description: >-
+        The zeabur.app subdomain for this service. You point the Cloudflare
+        Worker at this, so it is the origin, not the URL you browse.
+    - key: ROOT_URL
+      type: STRING
+      name: Public root URL
+      description: >-
+        The URL you actually browse — your Cloudflare Worker. Forgejo builds every
+        link and redirect from this, so it must match, with a trailing slash.
+  services:
+    - name: forgejo
+      template: PREBUILT
+      domainKey: PUBLIC_DOMAIN
+      icon: https://forgejo.org/_astro/logo.svg
+      spec:
+        source:
+          # 15.x LTS (supported to 2027-07) rather than latest stable, so an
+          # unattended personal instance is not forced to upgrade every ~4 months.
+          image: codeberg.org/forgejo/forgejo:15
+        ports:
+          - id: web
+            port: 3000
+            type: HTTP
+        volumes:
+          # THE critical part. Without this, Zeabur's filesystem is ephemeral and
+          # every repo disappears on restart. If the free plan refuses to mount
+          # this, stop — the platform is unusable for a git host.
+          - id: data
+            dir: /data
+        env:
+          # --- how it is reached ------------------------------------------
+          FORGEJO__server__ROOT_URL:
+            default: ${ROOT_URL}
+          FORGEJO__server__PROTOCOL:
+            default: http
+          FORGEJO__server__HTTP_ADDR:
+            default: 0.0.0.0
+          FORGEJO__server__HTTP_PORT:
+            default: "3000"
+          # No SSH: both the Zeabur edge and the Worker terminate HTTPS for us.
+          FORGEJO__server__START_SSH_SERVER:
+            default: "false"
+          FORGEJO__server__DISABLE_SSH:
+            default: "true"
+          # The container is only reachable through Zeabur's load balancer, so
+          # trusting the forwarded headers is safe here.
+          FORGEJO__security__REVERSE_PROXY_TRUSTED_PROXIES:
+            default: "*"
+
+          # --- it is only ever me -----------------------------------------
+          FORGEJO__service__DISABLE_REGISTRATION:
+            default: "true"
+          FORGEJO__service__REQUIRE_SIGNIN_VIEW:
+            default: "true"
+          FORGEJO__service__ENABLE_NOTIFY_MAIL:
+            default: "false"
+          FORGEJO__session__COOKIE_SECURE:
+            default: "true"
+
+          # --- lean UI: code, browse, releases. nothing else --------------
+          FORGEJO__repository__DEFAULT_REPO_UNITS:
+            default: repo.code,repo.releases
+          FORGEJO__repository__DISABLED_REPO_UNITS:
+            default: repo.issues,repo.pulls,repo.wiki,repo.projects,repo.packages
+          FORGEJO__repository__DEFAULT_BRANCH:
+            default: main
+          FORGEJO__repository__DEFAULT_PRIVATE:
+            default: private
+          FORGEJO__actions__ENABLED:
+            default: "false"
+          FORGEJO__packages__ENABLED:
+            default: "false"
+          FORGEJO__mirror__ENABLED:
+            default: "false"
+
+          # --- storage ----------------------------------------------------
+          FORGEJO__database__DB_TYPE:
+            default: sqlite3
+          FORGEJO__database__PATH:
+            default: /data/gitea/forgejo.db
+          FORGEJO__log__LEVEL:
+            default: Info
+
+          # NOTE: INSTALL_LOCK is deliberately NOT set to true here.
+          # On the local Docker setup we create the admin with
+          #   forgejo admin user create ...
+          # which needs a shell in the container. Zeabur free may not give you
+          # one, and with registration disabled and no admin you would be locked
+          # out permanently. So instead the first visit shows Forgejo's install
+          # wizard, where you create the admin account yourself.
+          # Immediately after that, set FORGEJO__security__INSTALL_LOCK=true in
+          # the Zeabur dashboard and redeploy.
+  readme: |
+    # Forgejo on Zeabur
+
+    Deploy, then **open the service URL immediately** and complete the install
+    wizard — that is where you create your admin account. Until you do, the
+    installer is reachable by anyone who finds the URL.
+
+    Right after the wizard:
+
+    1. Add `FORGEJO__security__INSTALL_LOCK` = `true` in Variables, redeploy.
+    2. Enable TOTP 2FA on your account.
+    3. Point your Cloudflare Worker at this service's `.zeabur.app` domain:
+       `wrangler secret put FORGE_ORIGIN`
+
+    ## If the volume will not mount
+
+    The Free plan may not permit volumes. If the `Volumes` tab refuses the mount,
+    do not use this — Zeabur's filesystem is otherwise ephemeral and your
+    repositories will be destroyed on the next restart.
