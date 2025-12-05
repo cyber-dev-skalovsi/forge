@@ -13,8 +13,15 @@ services:
       FORGEJO__server__HTTP_PORT: 3000
       FORGEJO__server__START_SSH_SERVER: "false"
       FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__security__REVERSE_PROXY_TRUSTED_PROXIES: 127.0.0.0/8,172.16.0.0/12,100.64.0.0/10
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__service__ENABLE_NOTIFY_MAIL: "false"
+      FORGEJO__session__COOKIE_SECURE: ${FORGE_COOKIE_SECURE:-true}
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__database__PATH: /data/gitea/forgejo.db
+      FORGEJO__log__LEVEL: Info
     volumes:
       - ./data:/data
       - /etc/timezone:/etc/timezone:ro
