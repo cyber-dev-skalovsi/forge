@@ -15,6 +15,7 @@ you want it public — through a Cloudflare Worker that fronts a quick tunnel.
 
 - server/compose.yml — canonical Forgejo config
 - server/compose.local.yml — generated local variant (named volume)
+- server/.env — local ports and hostname
 - server/setup.sh — bootstrap a fresh Oracle box
 - server/backup.sh — nightly restic backup
 - server/restore-drill.sh — prove the backup restores
