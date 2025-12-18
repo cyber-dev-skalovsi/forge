@@ -1,0 +1,5 @@
+.forge-env
+.forge-env.bak
+.cloudflared-path
+.tunnel-url
+tunnel.log
