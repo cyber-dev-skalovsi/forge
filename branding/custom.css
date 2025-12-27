@@ -1,0 +1,49 @@
+/* Talon — gold/amber accent, rounded UI, subtle fade-up motion. */
+
+:root {
+    --color-primary: #b8962e;
+    --color-primary-dark-1: #a0801f;
+    --color-primary-dark-2: #8a6d19;
+    --color-primary-light-1: #cbab4a;
+    --color-primary-light-2: #ddc06a;
+    --color-primary-alpha-10: rgba(184, 150, 46, 0.1);
+    --color-primary-alpha-20: rgba(184, 150, 46, 0.2);
+    --color-secondary: #e6c866;
+    --color-link: #b8962e;
+}
+
+.ui.button,
+.ui.input input,
+.ui.form input,
+.ui.form textarea,
+.ui.form select,
+.ui.card,
+.ui.cards > .card,
+.flex-item,
+.ui.segment,
+.ui.attached.segment,
+.ui.label,
+.ui.avatar,
+img.ui.avatar,
+.ui.dropdown .menu,
+.repo-header,
+.ui.tabular.menu .item,
+textarea,
+pre,
+.markup pre,
+.markup code {
+    border-radius: 12px !important;
+}
+
+@keyframes talon-fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#profile-avatar-card,
+.flex-list > .flex-item,
+.ui.cards > .card,
+.repository.file-list,
+.page-content > .ui.container > * {
+    animation: talon-fade-up 0.4s ease-out both;
+}
