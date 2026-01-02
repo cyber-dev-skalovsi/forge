@@ -19,6 +19,13 @@ services:
       FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
       FORGEJO__service__ENABLE_NOTIFY_MAIL: "false"
       FORGEJO__session__COOKIE_SECURE: ${FORGE_COOKIE_SECURE:-true}
+      FORGEJO__repository__DEFAULT_REPO_UNITS: repo.code,repo.releases
+      FORGEJO__repository__DISABLED_REPO_UNITS: repo.issues,repo.pulls,repo.wiki,repo.projects,repo.packages
+      FORGEJO__repository__DEFAULT_BRANCH: main
+      FORGEJO__repository__DEFAULT_PRIVATE: private
+      FORGEJO__actions__ENABLED: "false"
+      FORGEJO__packages__ENABLED: "false"
+      FORGEJO__mirror__ENABLED: "false"
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__database__PATH: /data/gitea/forgejo.db
       FORGEJO__log__LEVEL: Info
