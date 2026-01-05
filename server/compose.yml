@@ -26,6 +26,8 @@ services:
       FORGEJO__actions__ENABLED: "false"
       FORGEJO__packages__ENABLED: "false"
       FORGEJO__mirror__ENABLED: "false"
+      FORGEJO__other__SHOW_FOOTER_VERSION: "false"
+      FORGEJO__other__SHOW_FOOTER_TEMPLATE_LOAD_TIME: "false"
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__database__PATH: /data/gitea/forgejo.db
       FORGEJO__log__LEVEL: Info
