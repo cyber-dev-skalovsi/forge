@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Bootstrap a fresh Ubuntu 24.04 ARM box (Oracle Always Free) into the forge host.
+# Idempotent: safe to re-run.
 set -Eeuo pipefail
 FORGE_DIR=/opt/forge
 log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -28,14 +30,17 @@ fi
 
 log "forge directory"
 mkdir -p "$FORGE_DIR"
-cp -n compose.yml "$FORGE_DIR/" 2>/dev/null || true
-cp -n .env "$FORGE_DIR/.env" 2>/dev/null || true
+if [ "$(realpath .)" != "$FORGE_DIR" ]; then
+    cp -n compose.yml "$FORGE_DIR/" 2>/dev/null || true
+    cp -n .env "$FORGE_DIR/.env" 2>/dev/null || true
+fi
 mkdir -p "$FORGE_DIR/data"
 chown -R 1000:1000 "$FORGE_DIR/data"
 
 [ -f "$FORGE_DIR/.env" ] || { echo "!! $FORGE_DIR/.env missing — copy .env.example and fill it in"; exit 1; }
 
 log "oracle's default iptables drops most inbound; nothing to open (tailscale is outbound-only)"
+
 log "starting forgejo"
 cd "$FORGE_DIR"
 docker compose pull -q
@@ -52,9 +57,14 @@ done
 log "next steps (need your input, so not automated here)"
 cat <<'NEXT'
   1. tailscale up --ssh
-  2. tailscale serve --bg 3000
-  3. tailscale funnel --bg 3000
+  2. tailscale serve --bg 3000                 # private HTTPS on your tailnet
+  3. tailscale funnel --bg 3000                # public HTTPS (enable Funnel first)
   4. create your admin account:
-       cd /opt/forge && docker compose exec -u git forgejo forgejo admin user create --admin --username YOURNAME --email you@example.com --random-password
-  5. install /etc/forge-backup.env and the cron
+       cd /opt/forge && docker compose exec -u git forgejo \
+         forgejo admin user create --admin --username YOURNAME \
+         --email you@example.com --random-password
+     then log in, change the password, and enable TOTP 2FA immediately.
+  5. install /etc/forge-backup.env (chmod 600) and add the cron:
+       echo '17 3 * * * root /opt/forge/backup.sh >> /var/log/forge-backup.log 2>&1' \
+         > /etc/cron.d/forge-backup
 NEXT
