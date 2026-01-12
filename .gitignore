@@ -3,3 +3,4 @@
 .cloudflared-path
 .tunnel-url
 tunnel.log
+push-listener.log
