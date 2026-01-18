@@ -31,6 +31,7 @@ services:
       FORGEJO__database__DB_TYPE: sqlite3
       FORGEJO__database__PATH: /data/gitea/forgejo.db
       FORGEJO__log__LEVEL: Info
+      FORGEJO__webhook__ALLOWED_HOST_LIST: host.docker.internal
     volumes:
       - forgedata:/data
     ports:
