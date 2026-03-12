@@ -34,6 +34,10 @@ git push            # auto-triggers an encrypted snapshot in the background (see
 You normally never need to run `./forge.sh push` yourself — every `git push` to any repo
 on the forge fires a webhook that runs it for you (see **Auto-push on every commit**).
 
+`push` and `pull` stop Forgejo briefly on purpose: SQLite with a live write-ahead log cannot
+be copied safely, and a snapshot that restores corrupt is worse than no snapshot. That
+means **every auto-push causes a ~15-20s blip** while it happens — expected, not a bug.
+
 Only run the forge on one machine at a time. Two at once diverge, and nothing here can
 merge them. `./forge.sh status` shows which host pushed last and when.
 
@@ -45,9 +49,6 @@ merge them. `./forge.sh status` shows which host pushed last and when.
 | `./forge.sh pull` | stop → **replace** local state with newest snapshot → restart |
 | `./forge.sh status` | snapshots, who pushed last, size on the provider |
 | `./forge.sh drill` | prove a restore works, without touching live data |
-
-`push` and `pull` stop Forgejo briefly on purpose: SQLite with a live write-ahead log cannot
-be copied safely, and a snapshot that restores corrupt is worse than no snapshot.
 
 ## Auto-push on every commit
 
@@ -64,25 +65,6 @@ before doing anything, and only listens on `127.0.0.1:9988`. Talon reaches it fr
 its container via `host.docker.internal`, which needed adding to
 `FORGEJO__webhook__ALLOWED_HOST_LIST` — Forgejo blocks webhooks to loopback/private
 targets by default (SSRF guard).
-
-Every repo on the forge has a webhook pointed at it already. For a new repo:
-
-```bash
-SECRET=$(grep '^WEBHOOK_SECRET=' .forge-env | cut -d= -f2-)
-curl -s -u talon:<password> -X POST "http://127.0.0.1:3002/api/v1/repos/talon/<repo>/hooks" \
-  -H "Content-Type: application/json" \
-  -d "{\"type\":\"gitea\",\"config\":{\"url\":\"http://host.docker.internal:9988/hook\",\"content_type\":\"json\",\"secret\":\"$SECRET\"},\"events\":[\"push\"],\"active\":true}"
-```
-
-## Setting up a second machine
-
-1. Install Docker.
-2. Copy this `forge/` directory over (or clone it from the forge itself).
-3. Drop in `.forge-env` with the same values (now includes `WEBHOOK_SECRET`).
-4. `./forge.sh pull`
-5. `node push-listener.js &` if you want auto-push on that machine too.
-
-That's it — same repos, same users, same settings, same branding.
 
 ## Credentials — `.forge-env`
 
