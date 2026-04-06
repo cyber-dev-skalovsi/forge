@@ -82,6 +82,31 @@ WEBHOOK_SECRET=<random hex, used to verify push-listener.js requests>
 ⚠️ **`RESTIC_PASSWORD` in your password manager, now.** Lose it and everything in the cloud is
 permanently unreadable. That is exactly the property you asked for, and it cuts both ways.
 
+## Verified, not assumed
+
+Measured against the **live Backblaze B2 bucket** (`homelab-uploads`, prefix `forge/`):
+
+| Check | Result |
+|---|---|
+| **Deleted the forge volume, the local repo AND the restic cache**, leaving B2 as the only copy — then pulled | user `fynn` (since renamed to `talon`), repo HEAD `042fa8ad`, `src/app.py` contents all identical; repo clones cleanly |
+| Restore drill into a scratch volume | database + `fynn/hello.git` present |
+| **Is what B2 stores actually unreadable?** | downloaded a real stored object: opaque binary, **0 hits** for `fynn`, `hello`, `README`, `app.py`, `print`, `gitea`, `forgejo` |
+| Do filenames leak anything? | no — 6 objects, all named by content hash, **0 filename matches** for any of those terms |
+| Compression / dedup | **37.4x ratio, 97.3% saving**; 5.3 MiB of state → **135 KiB** uploaded |
+| Incremental push | a second push added 20 KiB |
+| Nothing exposed | Worker **deleted** (404), no `cloudflared`, Forgejo bound to `127.0.0.1` only |
+| `.forge-env` permissions | NTFS ACL restricted to your account only (SYSTEM/Administrators removed) |
+
+Reproduce it yourself any time. With the passphrase, everything is readable:
+
+```bash
+docker run --rm --env-file .forge-env restic/restic:latest snapshots
+```
+
+Without it, nothing is — temporarily change `RESTIC_PASSWORD` and the same command fails
+with `wrong password or no key found`. And in the Backblaze web UI, open any object under
+`forge/data/` and you will see opaque binary: no filenames, no code, no repo names.
+
 ## Layout
 
 ```
