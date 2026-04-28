@@ -66,6 +66,29 @@ its container via `host.docker.internal`, which needed adding to
 `FORGEJO__webhook__ALLOWED_HOST_LIST` — Forgejo blocks webhooks to loopback/private
 targets by default (SSRF guard).
 
+Every repo on the forge has a webhook pointed at it already. For a new repo:
+
+```bash
+SECRET=$(grep '^WEBHOOK_SECRET=' .forge-env | cut -d= -f2-)
+curl -s -u talon:<password> -X POST "http://127.0.0.1:3002/api/v1/repos/talon/<repo>/hooks" \
+  -H "Content-Type: application/json" \
+  -d "{\"type\":\"gitea\",\"config\":{\"url\":\"http://host.docker.internal:9988/hook\",\"content_type\":\"json\",\"secret\":\"$SECRET\"},\"events\":[\"push\"],\"active\":true}"
+```
+
+The listener isn't a persistent service (no Task Scheduler entry yet) — if it isn't
+running, pushes still work, they just don't auto-back-up until you run `forge.sh push`
+yourself or start the listener again.
+
+## Setting up a second machine
+
+1. Install Docker.
+2. Copy this `forge/` directory over (or clone it from the forge itself).
+3. Drop in `.forge-env` with the same values (now includes `WEBHOOK_SECRET`).
+4. `./forge.sh pull`
+5. `node push-listener.js &` if you want auto-push on that machine too.
+
+That's it — same repos, same users, same settings, same branding.
+
 ## Credentials — `.forge-env`
 
 Not in git (`.gitignore`d), `chmod 600`. **No quotes around values** — Docker's `--env-file`
@@ -123,6 +146,29 @@ zeabur/                  Zeabur deploy config — unused, kept for reference
 server/setup.sh          bootstraps a real Linux server, for if you ever go always-on
 ```
 
+### Branding (logo, name, colors, avatar)
+
+None of this lives in `compose.yml` — Forgejo only supports it as files inside the data
+volume itself (`custom/public/assets/img/`, `custom/public/assets/css/`,
+`custom/templates/custom/header.tmpl`), so it survives `forge.sh push`/`pull` for free but
+has to be reapplied by hand if you ever start from a truly empty volume:
+
+- `logo.svg` / `favicon.png` at `/data/gitea/public/assets/img/` — override the built-in ones.
+  (Older Gitea/Forgejo docs say `public/img/`; this version wants `public/assets/img/` and
+  logs a "legacy path" warning if you use the old one.)
+- `branding/custom.css` gets inlined into `/data/gitea/templates/custom/header.tmpl` as a
+  `<style>` block — there's no generic static file server for arbitrary custom assets
+  (only the whitelisted logo/favicon get served directly), so linking a standalone
+  `.css` file doesn't work; the content has to be injected via the template hook instead.
+- `APP_NAME` (shown as the page title) can't be set via `FORGEJO__DEFAULT__APP_NAME` —
+  Gitea's env-to-ini writes that into a literal `[default]` section, not the real
+  top-level one it reads at startup — so it's patched directly in `app.ini` instead.
+- Username `admin` is reserved (collides with the `/admin` panel route); the account is
+  `talon`.
+
+`worker/` and `zeabur/` are kept deliberately. Both are complete and tested; if you ever get
+an always-on machine, `wrangler deploy` puts the public URL back in one step.
+
 ## Honest limitations
 
 1. **Not always-on.** Deliberately traded away — availability needs hardware you own or a
@@ -130,12 +176,24 @@ server/setup.sh          bootstraps a real Linux server, for if you ever go alwa
    Render, OpenShift Sandbox, Zeabur, Fly, Railway, Northflank).
 2. **One machine at a time.** Concurrent use diverges irrecoverably.
 3. **Push is manual.** Forget it and that session's work exists only on that machine.
+4. **This is a work-managed machine.** Your projects still touch its disk while the forge
+   runs. They're now recoverable elsewhere and nothing is network-exposed, but a reimage
+   still wipes the local copy — so push before you walk away.
+5. **B2 free tier is 10 GB.** ~150 KiB per snapshot today; `./forge.sh status` shows usage.
 
 ## Gotchas found while building this
 
-- Docker named volumes live inside the Docker Desktop VM and are invisible to Windows.
-- Git Bash rewrites absolute paths before the Docker CLI sees them — `MSYS_NO_PATHCONV`.
-- `restic restore` does not delete files missing from the snapshot, so `pull` wipes the
-  volume first.
+- Docker named volumes live inside the Docker Desktop VM and are invisible to Windows, which
+  is why restic runs in a container. It also makes every command identical on Linux/macOS.
+- Git Bash rewrites absolute paths before the Docker CLI sees them — container-side paths need
+  `MSYS_NO_PATHCONV=1`, host-side paths need `cygpath -w`.
+- `restic restore` does not delete files missing from the snapshot, so `pull` wipes the volume
+  first. Without that you'd silently merge two machines' states.
+- A fresh `workers.dev` subdomain 404s with `error code 1042` for a minute after first deploy.
+- `curl --retry` ignores error 52 unless you add `--retry-all-errors`.
+- `wrangler dev` does not hot-reload `.dev.vars` and leaves orphaned `workerd` processes.
 - Forgejo webhooks refuse to call loopback/private-range URLs by default (SSRF guard) — a
-  webhook to `host.docker.internal` needs `FORGEJO__webhook__ALLOWED_HOST_LIST` set.
+  webhook to `host.docker.internal` needs `FORGEJO__webhook__ALLOWED_HOST_LIST` set, or it
+  fails silently in the delivery log with no error surfaced to the UI.
+- `docker cp`/`docker exec` with container-absolute paths get mangled by Git Bash exactly
+  like the container-path issue above — same fix, `MSYS_NO_PATHCONV=1`.
