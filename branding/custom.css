@@ -70,6 +70,8 @@ pre,
 .flex-list > .flex-item:nth-child(n+7) { animation-delay: 0.26s; }
 
 /* --- profile page: repos as a GitHub-style 2-column grid of boxes ------ */
+/* Scoped to the profile layout only (the grid that contains the avatar
+   card), so other flex-lists (issues, explore, org pages) are untouched. */
 .ui.stackable.grid:has(#profile-avatar-card) .flex-list {
     display: grid;
     grid-template-columns: repeat(2, 1fr);

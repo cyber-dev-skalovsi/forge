@@ -12,7 +12,3 @@ RESTIC_REPOSITORY=b2:paste_bucket_name_here:forge
 # Your own long passphrase. Generate it in your password manager and SAVE IT
 # THERE FIRST — there is no recovery path if this is lost.
 RESTIC_PASSWORD=paste_a_long_passphrase_here
-
-# Random hex used to verify push-listener.js webhook requests. Generate with:
-#   openssl rand -hex 32
-WEBHOOK_SECRET=paste_a_random_hex_here

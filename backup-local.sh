@@ -2,6 +2,9 @@
 # Local backup: one self-contained forgejo dump (db + repos + config) per run,
 # keeping the newest KEEP. This same file is what you would restore onto a real
 # server, so it doubles as the migration artifact.
+#
+# Offsite is NOT covered here — see README. A dump sitting on the same disk as
+# the forge does not survive that disk dying.
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
@@ -12,6 +15,9 @@ KEEP=7
 mkdir -p "$DEST"
 STAMP=$(date +%Y-%m-%d_%H%M)
 
+# On Git Bash, absolute paths get rewritten to Windows form before the docker CLI
+# sees them. Container-side paths must be protected with MSYS_NO_PATHCONV, while
+# the host-side path must be converted the other way, to native form.
 if command -v cygpath >/dev/null 2>&1; then
     DEST_NATIVE=$(cygpath -w "$DEST")
 else
@@ -28,6 +34,7 @@ MSYS_NO_PATHCONV=1 docker exec -u git "$CONTAINER" rm -f /tmp/d.zip
 SIZE=$(du -h "$DEST/forgejo-$STAMP.zip" | cut -f1)
 echo "wrote $DEST/forgejo-$STAMP.zip ($SIZE)"
 
+# Keep only the newest KEEP dumps.
 ls -1t "$DEST"/forgejo-*.zip 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
     echo "pruning $(basename "$old")"
     rm -f "$old"

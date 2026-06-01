@@ -33,12 +33,9 @@ git push            # auto-triggers an encrypted snapshot in the background (see
 
 You normally never need to run `./forge.sh push` yourself — every `git push` to any repo
 on the forge fires a webhook that runs it for you (see **Auto-push on every commit**).
+It's still there for manual use, or on machines where the listener isn't running.
 
-`push` and `pull` stop Forgejo briefly on purpose: SQLite with a live write-ahead log cannot
-be copied safely, and a snapshot that restores corrupt is worse than no snapshot. That
-means **every auto-push causes a ~15-20s blip** while it happens — expected, not a bug.
-
-Only run the forge on one machine at a time. Two at once diverge, and nothing here can
+**Only run the forge on one machine at a time.** Two at once diverge, and nothing here can
 merge them. `./forge.sh status` shows which host pushed last and when.
 
 | Command | Does |
@@ -49,6 +46,10 @@ merge them. `./forge.sh status` shows which host pushed last and when.
 | `./forge.sh pull` | stop → **replace** local state with newest snapshot → restart |
 | `./forge.sh status` | snapshots, who pushed last, size on the provider |
 | `./forge.sh drill` | prove a restore works, without touching live data |
+
+`push` and `pull` stop Forgejo briefly on purpose: SQLite with a live write-ahead log cannot
+be copied safely, and a snapshot that restores corrupt is worse than no snapshot. That
+means **every auto-push causes a ~15-20s blip** while it happens — expected, not a bug.
 
 ## Auto-push on every commit
 

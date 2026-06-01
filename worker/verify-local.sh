@@ -3,6 +3,10 @@
 # Oracle, Cloudflare, or Tailscale. Requires docker + node.
 #
 #   ./verify-local.sh
+#
+# Brings up Forgejo 15 LTS on 127.0.0.1:3001, runs `wrangler dev` on :8788,
+# then pushes and clones a repo with a 5 MB blob straight through the Worker
+# and compares git object IDs on both sides.
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 

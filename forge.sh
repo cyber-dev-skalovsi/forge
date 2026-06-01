@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
+#
+# forge — a portable, encrypted personal git forge.
+#
+# Your repos live in a Docker volume locally, and as AES-256 encrypted,
+# compressed, deduplicated blobs in cloud storage. The storage provider holds
+# bytes it cannot read: encryption happens here, on this machine, before
+# anything is uploaded.
+#
+#   ./forge.sh init      create the encrypted repository (once, ever)
+#   ./forge.sh start     bring the forge up locally
+#   ./forge.sh stop      shut it down
+#   ./forge.sh push      stop -> snapshot encrypted to cloud -> start
+#   ./forge.sh pull      stop -> REPLACE local state with newest snapshot -> start
+#   ./forge.sh status    what's in the repository, and who pushed last
+#   ./forge.sh drill     prove a restore works, without touching live data
+#
+# Workflow across machines is: pull -> work -> push. Only ever run the forge on
+# one machine at a time; two at once diverge and nothing here can merge them.
 set -Eeuo pipefail
 cd "$(dirname "$0")"
+
 VOLUME=server_forgedata
 CACHE_VOLUME=forge_restic_cache
 SCRATCH_VOLUME=forge_restore_drill
@@ -19,29 +38,39 @@ require_env() {
     [ -f "$ENV_FILE" ] || {
         c_err "missing $ENV_FILE"
         cat <<'HELP'
+
 Create it with (no quotes around values — docker --env-file takes them literally):
+
   B2_ACCOUNT_ID=<keyID>
   B2_ACCOUNT_KEY=<applicationKey>
   RESTIC_REPOSITORY=b2:<bucket>:forge
   RESTIC_PASSWORD=<long passphrase>
+
 Then: chmod 600 .forge-env
 HELP
         exit 1
     }
+    # Read the repository URL so we know whether a local repo needs mounting.
     RESTIC_REPOSITORY=$(grep -E '^RESTIC_REPOSITORY=' "$ENV_FILE" | head -1 | cut -d= -f2-)
     [ -n "$RESTIC_REPOSITORY" ] || { c_err "RESTIC_REPOSITORY not set in $ENV_FILE"; exit 1; }
 }
 
+# A repo path under /repo means a local-filesystem repository held in a Docker
+# volume — used for testing the whole flow without cloud credentials.
 repo_mount_args() {
     case "$RESTIC_REPOSITORY" in
         /repo*) printf '%s\n' -v "forge_local_repo:/repo" ;;
     esac
 }
 
+# restic runs in a container because the forge volume lives inside the Docker VM
+# and is not reachable from the Windows filesystem. This also makes every command
+# here behave identically on Windows, Linux and macOS.
 restic_run() {
     local mode=$1; shift
     local mount="$VOLUME:/data"
     [ "$mode" = "ro" ] && mount="$mount:ro"
+    # shellcheck disable=SC2046
     MSYS_NO_PATHCONV=1 docker run --rm \
         --env-file "$ENV_FILE" \
         -v "$mount" \
@@ -51,6 +80,7 @@ restic_run() {
 }
 
 restic_scratch() {
+    # shellcheck disable=SC2046
     MSYS_NO_PATHCONV=1 docker run --rm \
         --env-file "$ENV_FILE" \
         -v "$SCRATCH_VOLUME:/restore" \
@@ -77,7 +107,7 @@ cmd_init() {
     require_env
     say "creating encrypted repository"
     restic_run ro init
-    c_ok "repository created"
+    c_ok "repository created — its contents are unreadable without RESTIC_PASSWORD"
     c_warn "put that passphrase in your password manager NOW. There is no recovery without it."
 }
 
@@ -85,14 +115,20 @@ cmd_push() {
     require_env
     local was_running=0
     forge_running && was_running=1
+
+    # SQLite with a live write-ahead log cannot be copied safely. A few seconds
+    # of downtime buys a snapshot that actually restores.
     if [ "$was_running" -eq 1 ]; then
         say "stopping forge for a consistent snapshot"
         "${COMPOSE[@]}" down
     fi
+
     say "encrypting and uploading"
     restic_run ro backup /data --tag forge --host "$(hostname)"
+
     say "pruning old snapshots"
     restic_run ro forget --tag forge --keep-last 10 --keep-daily 7 --keep-monthly 6 --prune
+
     [ "$was_running" -eq 1 ] && { say "restarting forge"; cmd_start; }
     c_ok "pushed"
 }
@@ -101,19 +137,31 @@ cmd_pull() {
     require_env
     say "newest snapshot in the repository"
     restic_run ro snapshots --latest 1 --tag forge
+
     if [ "${2:-}" != "--yes" ] && [ "${FORGE_ASSUME_YES:-}" != "1" ]; then
         c_warn "This REPLACES all local forge data with the snapshot above."
         printf 'Type yes to continue: '
         read -r reply
         [ "$reply" = "yes" ] || { echo "aborted"; exit 1; }
     fi
+
     forge_running && { say "stopping forge"; "${COMPOSE[@]}" down; }
+
+    # Let compose create the volume so it carries compose's labels. Otherwise the
+    # wipe step below creates it via `docker run` and every later `compose up`
+    # warns that the volume was not created by Compose.
     "${COMPOSE[@]}" up --no-start >/dev/null 2>&1 || true
+
+    # restic restore does not remove files that are absent from the snapshot, so
+    # wipe first — otherwise you get a merge of two machines' states, which is
+    # exactly the corruption this tool exists to avoid.
     say "clearing local state"
     MSYS_NO_PATHCONV=1 docker run --rm -v "$VOLUME:/data" "$ALPINE_IMAGE" \
         find /data -mindepth 1 -delete
+
     say "restoring and decrypting"
     restic_run rw restore latest --tag forge --target /
+
     say "starting forge"
     cmd_start
     c_ok "pulled"
@@ -135,6 +183,7 @@ cmd_drill() {
     say "restoring newest snapshot into a scratch volume (live data untouched)"
     docker volume rm "$SCRATCH_VOLUME" >/dev/null 2>&1 || true
     restic_scratch restore latest --tag forge --target /restore
+
     say "checking the restored copy contains a real forge"
     local out
     out=$(MSYS_NO_PATHCONV=1 docker run --rm -v "$SCRATCH_VOLUME:/restore" "$ALPINE_IMAGE" sh -c '
