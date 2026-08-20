@@ -1,3 +1,4 @@
+# talon local secrets and ephemeral state
 .forge-env
 .forge-env.bak
 .cloudflared-path
